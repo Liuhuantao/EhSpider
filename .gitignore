@@ -1,5 +1,11 @@
 # 日志文件
 log/
 
+# 爬取的图片
+*[Spd]*/
+
+# 一些东西
+things/
+
 # 好像是python配置文件夹
 __pycache__/
