@@ -64,7 +64,8 @@ class ehSpider(object):
     def parseHtml(self, html, state):
         text = etree.HTML(html)
         try:
-            if (state == 'a'):
+            # 爬取全部
+            if (state == 'all'):
                 # 表站和里站的代码稍微有点不一样，所以要判断
                 if (self.urlMode == 1):
                     firstUrl = text.xpath("//body/div[@id = 'gdt']/div[1]/a/@href")[0]
@@ -72,6 +73,7 @@ class ehSpider(object):
                     firstUrl = text.xpath("//body/div[@id = 'gdt']/div[1]/div/a/@href")[0]
                 totalNumber = int(text.xpath("//body/div[@class = 'gtb']/p/text()")[0].split(' ')[-2])
                 galleryName = text.xpath("//h1[@id = 'gn']/text()")[0]
+            # 爬取部分
             else:
                 # 计算第一张图片的索引
                 firstUrlIndex = self.imgRange[0] % 21
@@ -119,13 +121,13 @@ class ehSpider(object):
     def parsePictureHtml(self, html):
         text = etree.HTML(html)
         # 判断图片质量
+        # 原图
         if (self.imgMode == 1):
             try:
                 pictureUrl = text.xpath("//div[@id = 'i7']/a/@href")[0]
             except IndexError:
                 pictureUrl = text.xpath("//img[@id = 'img']/@src")[0]
-            #except:
-            #    pictureUrl = text.xpath("//img[@id = 'img']/@src")[0]
+        # 非原图
         else:
             pictureUrl = text.xpath("//img[@id = 'img']/@src")[0]
         
@@ -140,23 +142,22 @@ class ehSpider(object):
 
     # 计算范围
     def calculateRange(self):
+        # 范围为空时
         if (self.imgRange == ['']):
-            return None, 'a'
+            return None, 'all'
+        # 范围不为空时
         else:
-            range = {'p': int(self.imgRange[0]) // 21}
-            return range, 'p'
+            range = {'p': self.imgRange[0] // 21}
+            return range, 'part'
 
     # 主函数
     def run(self):
-        print('请求中...')
         range, state = self.calculateRange()
-        
         if isinstance(range, type(None)):
+            print('请求中...')
             html = self.getHtml(self.url)
         else:
-            # 转换为 int 类型
-            self.imgRange[0] = int(self.imgRange[0])
-            self.imgRange[1] = int(self.imgRange[1])
+            print('请求中...')
             html = self.getHtml(self.url, params = range)
         firstUrl, totalNumber, galleryName = self.parseHtml(html, state)
         self.getPictures(firstUrl, totalNumber, galleryName)
@@ -183,19 +184,22 @@ def main():
     # 检查链接是否是E站链接
     try:
         if (url.split('/')[2] == 'exhentai.org'):
+            # 里站
             urlMode = 1
         elif (url.split('/')[2] == 'e-hentai.org'):
+            # 表站
             urlMode = 2
         else:
-            print('你输入的链接不是Exhentai的链接或E-hentai的链接，请检查你输入的链接，然后重试！')
+            print('你输入的不是Exhentai的链接或E-hentai的链接，请检查你输入的链接，然后重试！')
             logger.warning('Program exited abnormally.')
             sys.exit()
     # 数组越界
     except IndexError:
-        print('你输入的链接不是Exhentai的链接或E-hentai的链接，请检查你输入的链接，然后重试！')
+        print('你输入的不是Exhentai的链接或E-hentai的链接，请检查你输入的链接，然后重试！')
         logger.critical('An IndexError occurred,This may be because you entered the wrong URL!', exc_info = True)
         logger.warning('Program exited abnormally.')
         sys.exit()
+
     try:
         # 输入要保存的图片质量
         imgMode = int(input('请选择你想保存的图片质量：\n1.原图（质量高，体积大，消耗GP点数多）；2.非原图（推荐）（质量中，体积小，不消耗GP点数）\n'))
@@ -205,23 +209,51 @@ def main():
         elif (imgMode == 2):
             logger.info('Chosen saved picture quality:2(Non-original image)')
         else:
-            print('输入有误，请输入 1 或 2 ！')
+            print('输入有误，请检查图片质量，然后重试！')
             logger.error('Image mode input error!')
             logger.warning('Program exited abnormally.')
             sys.exit()
     # 输入了非数字字符导致异常
     except ValueError:
-        print('输入有误，请输入 1 或 2 ！')
+        print('输入有误，请检查图片质量，然后重试！')
+        logger.error('Image mode input error!')
         logger.critical('A ValueError occurred,This may be because a non-numeric character was entered!', exc_info = True)
         sys.exit()
+
     # 输入图片范围
     imgRange = input('请输入你想爬取的图片范围（...-...）（下载所有留空即可）：').split('-')
+    # 注意！下面的检查无法保证 imgRange 一定是正确的
+    # 判断 imgRange 是否不为空
     if (imgRange != ['']):
+        # 判断是否输入有误
         if (len(imgRange) != 2):
-            print('图片范围输入有误，请重试！')
+            print('输入有误，请检查图片范围，然后重试！')
             logger.error('Image range input error!')
             logger.warning('Program exited abnormally.')
             sys.exit()
+        # 输入正确时
+        else:
+            # 转换为 int 类型
+            try:
+                imgRange[0] = int(imgRange[0])
+                imgRange[1] = int(imgRange[1])
+            # 输入了非数字字符导致异常
+            except ValueError:
+                print('输入有误，请检查图片范围，然后重试！')
+                logger.error('Image range input error!')
+                logger.critical('A ValueError occurred,This may be because a non-numeric character was entered!', exc_info = True)
+                sys.exit()
+            # 前面的数大于后面的数
+            if (imgRange[0] > imgRange[1]):
+                print('输入有误，请检查图片范围，然后重试！')
+                logger.error('Image range input error(the first number is bigger than the second)!')
+                sys.exit()
+            # 前面的数小于等于0或后面的数小于等于0
+            elif (imgRange <= 0 or imgRange[1] <= 0):
+                print('输入有误，请检查图片范围，然后重试！')
+                logger.error('Image range input error(the first number ≤ 0 or the second number ≤ 0)!')
+                sys.exit()
+
     # 实例化爬虫类
     mySpider = ehSpider(url, imgMode, imgRange, urlMode)
     start = time.time()
@@ -231,6 +263,12 @@ def main():
 
 # 程序入口
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        print('程序意外退出，请查看日志！')
+        logger.critical('Unexpected program exit', exc_info = True)
+        sys.exit()
+
 
 #https://e-hentai.org/g/2461038/4968c1ffa6/
